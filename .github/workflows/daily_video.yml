@@ -1,0 +1,54 @@
+name: Daily YouTube Shorts Generator
+
+on:
+  schedule:
+    # Runs every day at 08:00 UTC
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+    # Allow manual trigger from GitHub Actions UI
+
+jobs:
+  generate-and-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            ffmpeg \
+            fonts-dejavu-core \
+            fonts-liberation
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate and upload Shorts video
+        env:
+          XAI_API_KEY:            ${{ secrets.XAI_API_KEY }}
+          YOUTUBE_CLIENT_ID:      ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET:  ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN:  ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          TTS_LANGUAGE:           ${{ vars.TTS_LANGUAGE || 'en' }}
+          OUTPUT_DIR:             /tmp/video_output
+        run: python src/main.py
+
+      - name: Upload video artefact (for debugging)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failed-video-output
+          path: /tmp/video_output/
+          retention-days: 3
